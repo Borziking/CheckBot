@@ -1,0 +1,10 @@
+{
+    "spreadsheet_id": "SHEET_ID",
+    "sheets": {
+        "duty": "GID",
+        "timesheet": "GID"
+    },
+    "urls": {
+        "monitor": "https://docs.google.com/spreadsheets/d/SHEET_ID/export?format=csv&gid=GID"
+    }
+}
