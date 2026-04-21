@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/csv"
-	"fmt"
+	"log"
 	"net/http"
 )
 
@@ -20,6 +20,6 @@ func fetchCSVFromURL(url string) ([][]string, error) {
 }
 
 func main() {
-	fmt.Println("Запускаем бота...")
+	log.Println("bot run")
 	startBot("token_bot")
 }

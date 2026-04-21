@@ -40,7 +40,7 @@ func startBot(token string) {
 		log.Fatal("Ошибка создания бота:", err)
 	}
 
-	log.Println("Бот запущен:", bot.Self.UserName)
+	log.Println("bot enable", bot.Self.UserName)
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 0
