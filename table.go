@@ -97,5 +97,5 @@ func drawTable(table TableData) {
 		}
 	}
 
-	dc.SavePNG("table.png")
+	dc.SavePNG("/pitrure/table.png")
 }
