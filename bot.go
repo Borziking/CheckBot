@@ -4,34 +4,31 @@ import (
 	"log"
 	"strings"
 	"sync"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const cooldownMinutes = 0
-
 var (
-	lastUsed = make(map[int64]time.Time)
-	mu       sync.Mutex
+	mu         sync.Mutex
+	processing = make(map[int64]bool)
 )
 
 func canUse(userID int64) bool {
 	mu.Lock()
 	defer mu.Unlock()
 
-	last, exists := lastUsed[userID]
-	if !exists {
-		lastUsed[userID] = time.Now()
-		return true
+	if processing[userID] {
+		return false
 	}
 
-	if time.Since(last) >= cooldownMinutes*time.Minute {
-		lastUsed[userID] = time.Now()
-		return true
-	}
+	processing[userID] = true
+	return true
+}
 
-	return false
+func doneProcessing(userID int64) {
+	mu.Lock()
+	defer mu.Unlock()
+	processing[userID] = false
 }
 
 func startBot(token string) {
@@ -55,14 +52,16 @@ func startBot(token string) {
 		chatID := update.Message.Chat.ID
 		text := update.Message.Text
 
+		log.Printf(">>> message: '%s' от userID: %d", text, userID)
+
 		switch {
 		case text == "/duty":
-			handleWithCooldown(bot, chatID, userID, func() {
+			go handleWithCooldown(bot, chatID, userID, func() {
 				handleDuty(bot, chatID)
 			})
 
 		case text == "/time_schedule":
-			handleWithCooldown(bot, chatID, userID, func() {
+			go handleWithCooldown(bot, chatID, userID, func() {
 				handleTimesheet(bot, chatID)
 			})
 
@@ -70,9 +69,10 @@ func startBot(token string) {
 			handleSettings(bot, chatID)
 
 		case text == "/monitor":
-			handleWithCooldown(bot, chatID, userID, func() {
+			go handleWithCooldown(bot, chatID, userID, func() {
 				handleMonitor(bot, chatID)
 			})
+
 		case strings.HasPrefix(text, "/setsheet "):
 			handleSetSheet(bot, chatID, text)
 		}
@@ -81,9 +81,10 @@ func startBot(token string) {
 
 func handleWithCooldown(bot *tgbotapi.BotAPI, chatID int64, userID int64, handler func()) {
 	if !canUse(userID) {
-		bot.Send(tgbotapi.NewMessage(chatID, "⏳ Подожди немного, команду можно использовать раз в 5 минут"))
+		bot.Send(tgbotapi.NewMessage(chatID, "⏳ Подожди, запрос уже выполняется..."))
 		return
 	}
+	defer doneProcessing(userID)
 	handler()
 }
 
@@ -160,6 +161,7 @@ func handleSetSheet(bot *tgbotapi.BotAPI, chatID int64, text string) {
 
 	bot.Send(tgbotapi.NewMessage(chatID, "✅ Лист '"+parts[1]+"' обновлён!"))
 }
+
 func handleMonitor(bot *tgbotapi.BotAPI, chatID int64) {
 	url, err := getURL("monitor")
 	if err != nil {
