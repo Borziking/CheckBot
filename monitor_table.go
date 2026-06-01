@@ -2,8 +2,6 @@ package main
 
 import (
 	"strings"
-
-	"github.com/fogleman/gg"
 )
 
 func drawMonitorTable(rows [][]string) {
@@ -11,88 +9,70 @@ func drawMonitorTable(rows [][]string) {
 		return
 	}
 
-	nameColW := 150.0
-	cellW := 110.0
-	cellH := 40.0
-
 	headers := rows[0]
-	dataRows := rows[1:]
-
-	filtered := [][]string{}
-	for _, row := range dataRows {
-		if len(row) > 0 && strings.TrimSpace(row[0]) != "" {
-			filtered = append(filtered, row)
-		}
-	}
-
 	cols := len(headers)
-	width := nameColW + cellW*float64(cols-1)
-	height := cellH * float64(len(filtered)+1)
 
-	dc := gg.NewContext(int(width), int(height))
-	dc.SetRGB(1, 1, 1)
-	dc.Clear()
-	dc.LoadFontFace("Roboto-Regular.ttf", 11)
-
-	headerBg := [3]float64{0.13, 0.37, 0.17}
-	checkedBg := [3]float64{0.72, 0.93, 0.72}
-	emptyBg := [3]float64{0.98, 0.98, 0.88}
-	nameBg := [3]float64{0.95, 0.95, 0.95}
-	grayBg := [3]float64{0.85, 0.85, 0.85}
-
-	drawCell := func(x, y, w, h float64, bg [3]float64, text string, light bool) {
-		dc.SetRGB(bg[0], bg[1], bg[2])
-		dc.DrawRectangle(x, y, w, h)
-		dc.Fill()
-
-		dc.SetRGB(0.75, 0.75, 0.75)
-		dc.SetLineWidth(0.5)
-		dc.DrawRectangle(x, y, w, h)
-		dc.Stroke()
-
-		if light {
-			dc.SetRGB(1, 1, 1)
-		} else {
-			dc.SetRGB(0, 0, 0)
+	data := [][]string{}
+	for _, row := range rows[1:] {
+		if len(row) > 0 && strings.TrimSpace(row[0]) != "" {
+			data = append(data, row)
 		}
-		dc.DrawStringAnchored(text, x+w/2, y+h/2, 0.5, 0.5)
 	}
 
-	drawCell(0, 0, nameColW, cellH, headerBg, headers[0], true)
+	nameW := 230.0
+	cellW := 128.0
+	cellH := 46.0
+	cellGap := 6.0
+	headerH := 64.0
+	step := cellW + cellGap
+	r := 9.0
+
+	contentW := nameW + cellGap + float64(cols-1)*step
+	contentH := headerH + cellGap + float64(len(data))*(cellH+cellGap)
+
+	dc, ox, oy := newCard(contentW, contentH, 36, 56, "Мониторинг")
+
+	colX := func(j int) float64 { return ox + nameW + cellGap + float64(j-1)*step }
+
+	fillRoundedHex(dc, ox, oy, nameW, headerH, r, colHeader)
+	textLeft(dc, fitString(dc, headers[0], fontBold, 16, nameW-32), ox, oy, nameW, headerH, 16, fontBold, 16, colOnDark)
 	for j := 1; j < cols; j++ {
-		x := nameColW + cellW*float64(j-1)
-		cleanHeader := strings.ReplaceAll(headers[j], "\n", "")
-		drawCell(x, 0, cellW, cellH, headerBg, cleanHeader, true)
+		x := colX(j)
+		fillRoundedHex(dc, x, oy, cellW, headerH, r, colHeader)
+		label := strings.ReplaceAll(headers[j], "\n", " ")
+		useFont(dc, fontMedium, 13)
+		setHex(dc, colOnDark)
+		dc.DrawStringWrapped(label, x+cellW/2, oy+headerH/2, 0.5, 0.5, cellW-12, 1.2, 1)
 	}
 
-	for i, row := range filtered {
-		y := float64(i+1) * cellH
+	rowTop := oy + headerH + cellGap
+	for i, row := range data {
+		y := rowTop + float64(i)*(cellH+cellGap)
 
-		drawCell(0, y, nameColW, cellH, nameBg, row[0], false)
+		nameBg := colCard
+		if i%2 == 1 {
+			nameBg = colRowAlt
+		}
+		fillRoundedHex(dc, ox, y, nameW, cellH, r, nameBg)
+		textLeft(dc, fitString(dc, row[0], fontMedium, 16, nameW-32), ox, y, nameW, cellH, 16, fontMedium, 16, colText)
 
 		for j := 1; j < cols; j++ {
-			x := nameColW + cellW*float64(j-1)
-			var bg [3]float64
-			var label string
-
-			if j >= len(row) {
-				bg = emptyBg
-				label = ""
-			} else {
-				val := strings.ToUpper(strings.TrimSpace(row[j]))
-				switch val {
-				case "TRUE":
-					bg = checkedBg
-					label = "+"
-				case "FALSE":
-					bg = emptyBg
-					label = ""
-				default:
-					bg = grayBg
-					label = val
-				}
+			x := colX(j)
+			val := ""
+			if j < len(row) {
+				val = strings.ToUpper(strings.TrimSpace(row[j]))
 			}
-			drawCell(x, y, cellW, cellH, bg, label, false)
+
+			switch val {
+			case "TRUE":
+				fillRoundedHex(dc, x, y, cellW, cellH, r, colAccent)
+				drawCheck(dc, x+cellW/2, y+cellH/2, 18, colOnDark)
+			case "FALSE", "":
+				fillRoundedHex(dc, x, y, cellW, cellH, r, "#F1F5F9")
+			default:
+				fillRoundedHex(dc, x, y, cellW, cellH, r, "#E2E8F0")
+				text(dc, val, x, y, cellW, cellH, fontMedium, 14, colMuted)
+			}
 		}
 	}
 

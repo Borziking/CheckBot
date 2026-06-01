@@ -12,6 +12,8 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/bot .
 COPY Roboto-Regular.ttf .
+COPY Roboto-Medium.ttf .
+COPY Roboto-Bold.ttf .
 COPY config.json .
 
 CMD ["./bot"]

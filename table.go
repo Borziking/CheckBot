@@ -2,99 +2,117 @@ package main
 
 import (
 	"strings"
-
-	"github.com/fogleman/gg"
 )
 
-func cellColor(value string) (r, g, b float64) {
+func statusColor(value string) (bg, fg string) {
 	v := strings.TrimSpace(strings.ToUpper(value))
-
 	switch {
+	case v == "":
+		return "#A7F3D0", "#065F46"
 	case v == "СС":
-		return 1, 0.4, 0.4
+		return "#FCA5A5", "#7F1D1D"
 	case v == "УД":
-		return 0.4, 0.6, 1
+		return "#93C5FD", "#1E3A8A"
 	case v == "Б":
-		return 1, 0.7, 0.3
+		return "#FDBA74", "#7C2D12"
 	case strings.HasPrefix(v, "-"):
-		return 1, 1, 0.5
+		return "#FCD34D", "#78350F"
 	default:
-		return 0.4, 0.8, 1
+		return "#67E8F9", "#155E75"
 	}
 }
 
+type legendItem struct {
+	bg, label string
+}
+
 func drawTable(table TableData) {
-	cellW0 := 200.0
-	cellW := 50.0
-	cellH := 30.0
 	cols := len(table.Headers)
-	rows := len(table.Rows)
-
-	width := cellW0 + cellW*float64(cols-1)
-	height := cellH * float64(rows+1)
-
-	dc := gg.NewContext(int(width), int(height))
-	dc.SetRGB(1, 1, 1)
-	dc.Clear()
-	dc.LoadFontFace("Roboto-Regular.ttf", 11)
-
-	colX := func(j int) float64 {
-		if j == 0 {
-			return 0
-		}
-		return cellW0 + cellW*float64(j-1)
+	rowsN := len(table.Rows)
+	if cols == 0 {
+		return
 	}
 
-	colWidth := func(j int) float64 {
-		if j == 0 {
-			return cellW0
-		}
-		return cellW
+	nameW := 340.0
+	cellW := 46.0
+	cellH := 42.0
+	cellGap := 5.0
+	headerH := 48.0
+	step := cellW + cellGap
+	r := 8.0
+
+	dayAreaW := float64(cols-1) * step
+	contentW := nameW + cellGap + dayAreaW
+	if contentW < nameW {
+		contentW = nameW
 	}
 
-	for j, header := range table.Headers {
-		x := colX(j)
-		w := colWidth(j)
+	legend := []legendItem{
+		{"#A7F3D0", "Отработано"},
+		{"#67E8F9", "Переработка"},
+		{"#FCD34D", "Ушёл раньше"},
+		{"#FCA5A5", "СС"},
+		{"#93C5FD", "УД"},
+		{"#FDBA74", "Больничный"},
+	}
+	legendH := 60.0
 
-		dc.SetRGB(0.2, 0.6, 0.4)
-		dc.DrawRectangle(x, 0, w, cellH)
-		dc.Fill()
+	contentH := headerH + cellGap + float64(rowsN)*(cellH+cellGap) + legendH
 
-		dc.SetRGB(0, 0, 0)
-		dc.SetLineWidth(0.5)
-		dc.DrawRectangle(x, 0, w, cellH)
-		dc.Stroke()
+	dc, ox, oy := newCard(contentW, contentH, 36, 56, "График учёта времени")
 
-		dc.SetRGB(1, 1, 1)
-		dc.DrawStringAnchored(header, x+w/2, cellH/2, 0.5, 0.5)
+	dayX := func(j int) float64 { return ox + nameW + cellGap + float64(j-1)*step }
+
+	fillRoundedHex(dc, ox, oy, nameW, headerH, r, colHeader)
+	if cols > 0 {
+		textLeft(dc, table.Headers[0], ox, oy, nameW, headerH, 16, fontBold, 17, colOnDark)
+	}
+	for j := 1; j < cols; j++ {
+		x := dayX(j)
+		fillRoundedHex(dc, x, oy, cellW, headerH, r, colHeader)
+		label := strings.ReplaceAll(table.Headers[j], "\n", "")
+		text(dc, label, x, oy, cellW, headerH, fontMedium, 15, colOnDark)
 	}
 
+	rowTop := oy + headerH + cellGap
 	for i, row := range table.Rows {
-		for j, cell := range row {
-			x := colX(j)
-			w := colWidth(j)
-			y := float64(i+1) * cellH
+		y := rowTop + float64(i)*(cellH+cellGap)
 
-			if j == 0 {
-				dc.SetRGB(0.95, 0.95, 0.95)
-			} else if strings.TrimSpace(cell) == "" {
-				dc.SetRGB(0.7, 1, 0.7)
-			} else {
-				r, g, b := cellColor(cell)
-				dc.SetRGB(r, g, b)
-			}
-
-			dc.DrawRectangle(x, y, w, cellH)
-			dc.Fill()
-
-			dc.SetRGB(0.7, 0.7, 0.7)
-			dc.SetLineWidth(0.5)
-			dc.DrawRectangle(x, y, w, cellH)
-			dc.Stroke()
-
-			dc.SetRGB(0, 0, 0)
-			dc.DrawStringAnchored(cell, x+w/2, y+cellH/2, 0.5, 0.5)
+		nameBg := colCard
+		if i%2 == 1 {
+			nameBg = colRowAlt
 		}
+		fillRoundedHex(dc, ox, y, nameW, cellH, r, nameBg)
+		name := ""
+		if len(row) > 0 {
+			name = row[0]
+		}
+		textLeft(dc, fitString(dc, name, fontMedium, 16, nameW-32), ox, y, nameW, cellH, 16, fontMedium, 16, colText)
+
+		for j := 1; j < cols; j++ {
+			x := dayX(j)
+			val := ""
+			if j < len(row) {
+				val = strings.TrimSpace(row[j])
+			}
+			bg, fg := statusColor(val)
+			fillRoundedHex(dc, x, y, cellW, cellH, r, bg)
+			if val != "" {
+				text(dc, val, x, y, cellW, cellH, fontMedium, 15, fg)
+			}
+		}
+	}
+
+	ly := rowTop + float64(rowsN)*(cellH+cellGap) + 14
+	lx := ox
+	sw := 18.0
+	for _, it := range legend {
+		fillRoundedHex(dc, lx, ly, sw, sw, 5, it.bg)
+		useFont(dc, fontRegular, 15)
+		setHex(dc, colMuted)
+		dc.DrawStringAnchored(it.label, lx+sw+8, ly+sw/2, 0, 0.5)
+		w, _ := dc.MeasureString(it.label)
+		lx += sw + 8 + w + 26
 	}
 
 	dc.SavePNG("table.png")

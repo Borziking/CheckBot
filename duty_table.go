@@ -3,14 +3,12 @@ package main
 import (
 	"strings"
 	"time"
-
-	"github.com/fogleman/gg"
 )
 
 func drawDutyTable(rows [][]string) {
-
-	colW := 120.0
-	cellH := 28.0
+	if len(rows) < 4 {
+		return
+	}
 
 	months := []string{}
 	monthCols := [][2]int{}
@@ -19,6 +17,9 @@ func drawDutyTable(rows [][]string) {
 			months = append(months, val)
 			monthCols = append(monthCols, [2]int{i, i + 1})
 		}
+	}
+	if len(months) == 0 {
+		return
 	}
 
 	monthNames := map[string]int{
@@ -32,93 +33,105 @@ func drawDutyTable(rows [][]string) {
 	today := time.Now().Day()
 	currentMonth := int(time.Now().Month())
 
-	totalCols := len(months) * 2
-	width := colW * float64(totalCols)
-	height := cellH * float64(len(dataRows)+3)
+	dateW := 92.0
+	nameW := 214.0
+	monthW := dateW + nameW
+	gap := 14.0
+	rowH := 50.0
+	monthH := 54.0
+	subH := 42.0
+	r := 12.0
 
-	dc := gg.NewContext(int(width), int(height))
-	dc.SetRGB(1, 1, 1)
-	dc.Clear()
-	dc.LoadFontFace("Roboto-Regular.ttf", 12)
+	headerH := monthH + subH
+	contentW := monthW*float64(len(months)) + gap*float64(len(months)-1)
+	contentH := headerH + rowH*float64(len(dataRows))
 
-	darkGreen := [3]float64{0.13, 0.37, 0.17}
-	lightGreen := [3]float64{0.72, 0.93, 0.72}
-	paleGreen := [3]float64{0.88, 0.97, 0.88}
-	todayColor := [3]float64{0.7, 0.75, 0.71}
-	grayColor := [3]float64{0.9, 0.9, 0.9}
+	dc, ox, oy := newCard(contentW, contentH, 36, 56, "График дежурств")
 
-	drawCell := func(x, y, w, h float64, bg [3]float64, text string, textLight bool) {
-		dc.SetRGB(bg[0], bg[1], bg[2])
-		dc.DrawRectangle(x, y, w, h)
+	dayFromString := func(s string) int {
+		clean := strings.TrimRight(strings.TrimSpace(s), "*")
+		n := 0
+		for _, c := range clean {
+			if c >= '0' && c <= '9' {
+				n = n*10 + int(c-'0')
+			}
+		}
+		return n
+	}
+
+	for mIdx, month := range months {
+		mx := ox + float64(mIdx)*(monthW+gap)
+		monthNum := monthNames[month]
+
+		fillTopRounded(dc, mx, oy, monthW, monthH, r, colHeader)
+		text(dc, month, mx, oy, monthW, monthH, fontBold, 22, colOnDark)
+
+		sy := oy + monthH
+		setHex(dc, colAccentBg)
+		dc.DrawRectangle(mx, sy, monthW, subH)
 		dc.Fill()
+		text(dc, "Дата", mx, sy, dateW, subH, fontMedium, 17, colAccentTx)
+		text(dc, "Дежурный", mx+dateW, sy, nameW, subH, fontMedium, 17, colAccentTx)
 
-		dc.SetRGB(0.8, 0.8, 0.8)
-		dc.SetLineWidth(0.5)
-		dc.DrawRectangle(x, y, w, h)
+		for rIdx, row := range dataRows {
+			ry := oy + headerH + float64(rIdx)*rowH
+			last := rIdx == len(dataRows)-1
+
+			dateVal, nameVal := "", ""
+			if monthCols[mIdx][0] < len(row) {
+				dateVal = strings.TrimSpace(row[monthCols[mIdx][0]])
+			}
+			if monthCols[mIdx][1] < len(row) {
+				nameVal = strings.TrimSpace(row[monthCols[mIdx][1]])
+			}
+
+			empty := dateVal == "" || dateVal == "-"
+			isToday := !empty && dayFromString(dateVal) == today && monthNum == currentMonth
+
+			bg := colCard
+			if rIdx%2 == 1 {
+				bg = colRowAlt
+			}
+			if isToday {
+				bg = colAccentBg
+			}
+			if last {
+				fillBottomRounded(dc, mx, ry, monthW, rowH, r, bg)
+			} else {
+				setHex(dc, bg)
+				dc.DrawRectangle(mx, ry, monthW, rowH)
+				dc.Fill()
+			}
+
+			if isToday {
+				setHex(dc, colAccent)
+				dc.DrawRectangle(mx, ry, 4, rowH)
+				dc.Fill()
+			}
+
+			dtHex, nmHex := colText, colText
+			if empty {
+				dtHex, nmHex = colMuted, colMuted
+			}
+			if isToday {
+				dtHex, nmHex = colAccentTx, colAccentTx
+			}
+			dateText := dateVal
+			if empty {
+				dateText = "—"
+			}
+			dateFont := fontRegular
+			if isToday {
+				dateFont = fontBold
+			}
+			text(dc, dateText, mx, ry, dateW, rowH, dateFont, 18, dtHex)
+			textLeft(dc, nameVal, mx+dateW, ry, nameW, rowH, 14, fontRegular, 18, nmHex)
+		}
+
+		setHex(dc, colBorder)
+		dc.SetLineWidth(1)
+		dc.DrawLine(mx+dateW, oy+headerH, mx+dateW, oy+headerH+rowH*float64(len(dataRows)))
 		dc.Stroke()
-
-		if textLight {
-			dc.SetRGB(1, 1, 1)
-		} else {
-			dc.SetRGB(0, 0, 0)
-		}
-		dc.DrawStringAnchored(text, x+w/2, y+h/2, 0.5, 0.5)
-	}
-
-	drawCell(0, 0, width, cellH, darkGreen, "Месяц", true)
-
-	for i, month := range months {
-		x := float64(i*2) * colW
-		drawCell(x, cellH, colW*2, cellH, darkGreen, month, true)
-	}
-
-	for i := range months {
-		x := float64(i*2) * colW
-		drawCell(x, cellH*2, colW, cellH, lightGreen, "Дата", false)
-		drawCell(x+colW, cellH*2, colW, cellH, lightGreen, "Дежурный", false)
-	}
-
-	for rowIdx, row := range dataRows {
-		if len(row) < 2 {
-			continue
-		}
-
-		y := float64(rowIdx+3) * cellH
-
-		for mIdx, cols := range monthCols {
-			if cols[1] >= len(row) {
-				continue
-			}
-
-			dateVal := strings.TrimSpace(row[cols[0]])
-			nameVal := strings.TrimSpace(row[cols[1]])
-
-			bg := paleGreen
-			if rowIdx%2 == 0 {
-				bg = lightGreen
-			}
-
-			monthNum := monthNames[months[mIdx]]
-			cleanDate := strings.TrimRight(dateVal, "*")
-			dayNum := 0
-			for _, c := range cleanDate {
-				if c >= '0' && c <= '9' {
-					dayNum = dayNum*10 + int(c-'0')
-				}
-			}
-			if dayNum == today && monthNum == currentMonth {
-				bg = todayColor
-			}
-
-			if dateVal == "" || dateVal == "-" {
-				bg = grayColor
-			}
-
-			x := float64(mIdx*2) * colW
-			textLight := false
-			drawCell(x, y, colW, cellH, bg, dateVal, textLight)
-			drawCell(x+colW, y, colW, cellH, bg, nameVal, textLight)
-		}
 	}
 
 	dc.SavePNG("duty.png")
