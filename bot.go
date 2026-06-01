@@ -20,7 +20,6 @@ func canUse(userID int64) bool {
 	if processing[userID] {
 		return false
 	}
-
 	processing[userID] = true
 	return true
 }
@@ -39,43 +38,63 @@ func startBot(token string) {
 
 	log.Println("bot enable", bot.Self.UserName)
 
+	setupCommands(bot)
+
 	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 0
+	u.Timeout = 60
 	updates := bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		if update.Message == nil {
-			continue
-		}
-
-		userID := update.Message.From.ID
-		chatID := update.Message.Chat.ID
-		text := update.Message.Text
-
-		log.Printf(">>> message: '%s' от userID: %d", text, userID)
-
 		switch {
-		case text == "/duty":
-			go handleWithCooldown(bot, chatID, userID, func() {
-				handleDuty(bot, chatID)
-			})
-
-		case text == "/time_schedule":
-			go handleWithCooldown(bot, chatID, userID, func() {
-				handleTimesheet(bot, chatID)
-			})
-
-		case text == "/settings":
-			handleSettings(bot, chatID)
-
-		case text == "/monitor":
-			go handleWithCooldown(bot, chatID, userID, func() {
-				handleMonitor(bot, chatID)
-			})
-
-		case strings.HasPrefix(text, "/setsheet "):
-			handleSetSheet(bot, chatID, text)
+		case update.CallbackQuery != nil:
+			handleCallback(bot, update.CallbackQuery)
+		case update.Message != nil:
+			handleMessage(bot, update.Message)
 		}
+	}
+}
+
+func setupCommands(bot *tgbotapi.BotAPI) {
+	cmds := []tgbotapi.BotCommand{
+		{Command: "menu", Description: "Открыть меню"},
+		{Command: "duty", Description: "График дежурств"},
+		{Command: "time_schedule", Description: "График учёта времени"},
+		{Command: "monitor", Description: "Мониторинг"},
+		{Command: "settings", Description: "Настройки таблиц (админ)"},
+	}
+	if _, err := bot.Request(tgbotapi.NewSetMyCommands(cmds...)); err != nil {
+		log.Println("не удалось установить команды:", err)
+	}
+}
+
+func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+	userID := msg.From.ID
+	chatID := msg.Chat.ID
+	text := msg.Text
+
+	log.Printf(">>> message: '%s' от userID: %d", text, userID)
+
+	if strings.HasPrefix(text, "/") {
+		clearPendingEdit(userID)
+	} else if consumePendingEdit(bot, chatID, userID, text) {
+		return
+	}
+
+	switch {
+	case text == "/start" || text == "/menu":
+		sendMenu(bot, chatID, userID)
+
+	case text == "/duty":
+		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, SourceDuty) })
+
+	case text == "/time_schedule":
+		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, SourceTimesheet) })
+
+	case text == "/monitor":
+		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, SourceMonitor) })
+
+	case text == "/settings":
+		sendSettings(bot, chatID, userID)
 	}
 }
 
@@ -86,98 +105,4 @@ func handleWithCooldown(bot *tgbotapi.BotAPI, chatID int64, userID int64, handle
 	}
 	defer doneProcessing(userID)
 	handler()
-}
-
-func handleDuty(bot *tgbotapi.BotAPI, chatID int64) {
-	url, err := getSheetURL("duty")
-	if err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Лист не настроен. Используй /settings"))
-		return
-	}
-
-	rows, err := fetchCSVFromURL(url)
-	if err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка загрузки данных"))
-		return
-	}
-
-	drawDutyTable(rows)
-
-	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath("duty.png"))
-	photo.Caption = "📅 График дежурств"
-	bot.Send(photo)
-}
-
-func handleTimesheet(bot *tgbotapi.BotAPI, chatID int64) {
-	url, err := getSheetURL("timesheet")
-	if err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Лист не настроен. Используй /settings"))
-		return
-	}
-
-	rows, err := fetchCSVFromURL(url)
-	if err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка загрузки данных"))
-		return
-	}
-
-	table := parseCSV(rows)
-	drawTable(table)
-
-	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath("table.png"))
-	photo.Caption = "⏱ График учёта времени"
-	bot.Send(photo)
-}
-
-func handleSettings(bot *tgbotapi.BotAPI, chatID int64) {
-	msg := tgbotapi.NewMessage(chatID,
-		"⚙️ *Настройки:*\n\n"+
-			"Изменить лист дежурства:\n`/setsheet duty ГИД`\n\n"+
-			"Изменить лист учёта времени:\n`/setsheet time_schedule ГИД`\n\n"+
-			"ГИД — число в конце ссылки после `gid=`")
-	msg.ParseMode = "Markdown"
-	bot.Send(msg)
-}
-
-func handleSetSheet(bot *tgbotapi.BotAPI, chatID int64, text string) {
-	parts := strings.Fields(text)
-	if len(parts) != 3 {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Формат: /setsheet duty 123456"))
-		return
-	}
-
-	cfg, err := loadConfig()
-	if err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка загрузки конфига"))
-		return
-	}
-
-	cfg.Sheets[parts[1]] = parts[2]
-	err = saveConfig(cfg)
-	if err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка сохранения конфига"))
-		return
-	}
-
-	bot.Send(tgbotapi.NewMessage(chatID, "✅ Лист '"+parts[1]+"' обновлён!"))
-}
-
-func handleMonitor(bot *tgbotapi.BotAPI, chatID int64) {
-	url, err := getURL("monitor")
-	if err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Лист не настроен"))
-		return
-	}
-
-	rows, err := fetchCSVFromURL(url)
-	if err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка загрузки данных"))
-		return
-	}
-
-	drawMonitorTable(rows)
-
-	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath("monitor.png"))
-	photo.Caption = "📊 Мониторинг"
-	bot.Send(photo)
 }

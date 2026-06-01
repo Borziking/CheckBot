@@ -1,10 +1,8 @@
 {
-    "spreadsheet_id": "SHEET_ID",
-    "sheets": {
-        "duty": "GID",
-        "timesheet": "GID" 
-    },
-    "urls": {
-        "monitor": "https://docs.google.com/spreadsheets/d/SHEET_ID/export?format=csv&gid=GID"
+    "admin_id": 0,
+    "sources": {
+        "duty": "https://docs.google.com/spreadsheets/d/SHEET_ID/export?format=csv\u0026gid=GID",
+        "monitor": "https://docs.google.com/spreadsheets/d/SHEET_ID/export?format=csv\u0026gid=GID",
+        "timesheet": "https://docs.google.com/spreadsheets/d/SHEET_ID/export?format=csv\u0026gid=GID"
     }
 }
