@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-const configPath = "config.json"
+const path = "config.json"
 
 const (
 	SourceDuty      = "duty"
@@ -22,14 +22,14 @@ type Config struct {
 	Sources map[string]string `json:"sources"`
 }
 
-var cfgMu sync.Mutex
+var mu sync.Mutex
 
-func loadConfig() (Config, error) {
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
+func Load() (Config, error) {
+	mu.Lock()
+	defer mu.Unlock()
 
 	var cfg Config
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return cfg, err
 	}
@@ -42,27 +42,27 @@ func loadConfig() (Config, error) {
 	return cfg, nil
 }
 
-func saveConfig(cfg Config) error {
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
+func Save(cfg Config) error {
+	mu.Lock()
+	defer mu.Unlock()
 
 	data, err := json.MarshalIndent(cfg, "", "    ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(configPath, data, 0644)
+	return os.WriteFile(path, data, 0644)
 }
 
-func isAdminID(userID int64) bool {
-	cfg, err := loadConfig()
+func IsAdmin(userID int64) bool {
+	cfg, err := Load()
 	if err != nil {
 		return false
 	}
 	return cfg.AdminID == userID
 }
 
-func sourceURL(key string) (string, error) {
-	cfg, err := loadConfig()
+func SourceURL(key string) (string, error) {
+	cfg, err := Load()
 	if err != nil {
 		return "", err
 	}
@@ -73,17 +73,17 @@ func sourceURL(key string) (string, error) {
 	return url, nil
 }
 
-func setSource(key, rawURL string) error {
+func SetSource(key, rawURL string) error {
 	url, err := normalizeSheetURL(rawURL)
 	if err != nil {
 		return err
 	}
-	cfg, err := loadConfig()
+	cfg, err := Load()
 	if err != nil {
 		return err
 	}
 	cfg.Sources[key] = url
-	return saveConfig(cfg)
+	return Save(cfg)
 }
 
 var (

@@ -5,15 +5,13 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN go build -o bot .
+RUN go build -o bot ./cmd/bot
 
 FROM alpine:latest
 
 WORKDIR /app
 COPY --from=builder /app/bot .
-COPY Roboto-Regular.ttf .
-COPY Roboto-Medium.ttf .
-COPY Roboto-Bold.ttf .
+COPY assets ./assets
 COPY config.json .
 
 CMD ["./bot"]

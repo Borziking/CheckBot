@@ -1,7 +1,9 @@
-package main
+package render
 
 import (
 	"strings"
+
+	"duty-bot/internal/sheets"
 )
 
 func statusColor(value string) (bg, fg string) {
@@ -26,11 +28,11 @@ type legendItem struct {
 	bg, label string
 }
 
-func drawTable(table TableData) {
+func Timesheet(table sheets.Table, out string) error {
 	cols := len(table.Headers)
 	rowsN := len(table.Rows)
 	if cols == 0 {
-		return
+		return nil
 	}
 
 	nameW := 340.0
@@ -41,8 +43,7 @@ func drawTable(table TableData) {
 	step := cellW + cellGap
 	r := 8.0
 
-	dayAreaW := float64(cols-1) * step
-	contentW := nameW + cellGap + dayAreaW
+	contentW := nameW + cellGap + float64(cols-1)*step
 	if contentW < nameW {
 		contentW = nameW
 	}
@@ -64,9 +65,7 @@ func drawTable(table TableData) {
 	dayX := func(j int) float64 { return ox + nameW + cellGap + float64(j-1)*step }
 
 	fillRoundedHex(dc, ox, oy, nameW, headerH, r, colHeader)
-	if cols > 0 {
-		textLeft(dc, table.Headers[0], ox, oy, nameW, headerH, 16, fontBold, 17, colOnDark)
-	}
+	textLeft(dc, table.Headers[0], ox, oy, nameW, headerH, 16, fontBold, 17, colOnDark)
 	for j := 1; j < cols; j++ {
 		x := dayX(j)
 		fillRoundedHex(dc, x, oy, cellW, headerH, r, colHeader)
@@ -115,5 +114,5 @@ func drawTable(table TableData) {
 		lx += sw + 8 + w + 26
 	}
 
-	dc.SavePNG("table.png")
+	return dc.SavePNG(out)
 }

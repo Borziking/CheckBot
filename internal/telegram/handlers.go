@@ -1,18 +1,28 @@
-package main
+package telegram
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
+	"duty-bot/internal/config"
+	"duty-bot/internal/render"
+	"duty-bot/internal/sheets"
 )
+
+func outPath(name string) string {
+	return filepath.Join(os.TempDir(), name)
+}
 
 func sendMenu(bot *tgbotapi.BotAPI, chatID, userID int64) {
 	rows := [][]tgbotapi.InlineKeyboardButton{
-		{tgbotapi.NewInlineKeyboardButtonData("📅 Дежурства", "show:"+SourceDuty)},
-		{tgbotapi.NewInlineKeyboardButtonData("⏱ График времени", "show:"+SourceTimesheet)},
-		{tgbotapi.NewInlineKeyboardButtonData("📊 Мониторинг", "show:"+SourceMonitor)},
+		{tgbotapi.NewInlineKeyboardButtonData("📅 Дежурства", "show:"+config.SourceDuty)},
+		{tgbotapi.NewInlineKeyboardButtonData("⏱ График времени", "show:"+config.SourceTimesheet)},
+		{tgbotapi.NewInlineKeyboardButtonData("📊 Мониторинг", "show:"+config.SourceMonitor)},
 	}
-	if isAdminID(userID) {
+	if config.IsAdmin(userID) {
 		rows = append(rows, []tgbotapi.InlineKeyboardButton{
 			tgbotapi.NewInlineKeyboardButtonData("⚙️ Настройки", "settings"),
 		})
@@ -22,27 +32,6 @@ func sendMenu(bot *tgbotapi.BotAPI, chatID, userID int64) {
 	msg.ParseMode = "Markdown"
 	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
 	bot.Send(msg)
-}
-
-func sendSettings(bot *tgbotapi.BotAPI, chatID, userID int64) {
-	if !isAdminID(userID) {
-		bot.Send(tgbotapi.NewMessage(chatID, "⛔ Доступ только для администратора"))
-		return
-	}
-
-	msg := tgbotapi.NewMessage(chatID, "⚙️ *Настройки таблиц*\nВыбери, какую таблицу изменить:")
-	msg.ParseMode = "Markdown"
-	msg.ReplyMarkup = settingsKeyboard()
-	bot.Send(msg)
-}
-
-func settingsKeyboard() tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.NewInlineKeyboardMarkup(
-		[]tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData(sourceTitles[SourceDuty], "edit:"+SourceDuty)},
-		[]tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData(sourceTitles[SourceTimesheet], "edit:"+SourceTimesheet)},
-		[]tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData(sourceTitles[SourceMonitor], "edit:"+SourceMonitor)},
-		[]tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", "menu")},
-	)
 }
 
 func handleCallback(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery) {
@@ -71,22 +60,22 @@ func handleCallback(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery) {
 
 func sendSource(bot *tgbotapi.BotAPI, chatID int64, key string) {
 	switch key {
-	case SourceDuty:
+	case config.SourceDuty:
 		sendDuty(bot, chatID)
-	case SourceTimesheet:
+	case config.SourceTimesheet:
 		sendTimesheet(bot, chatID)
-	case SourceMonitor:
+	case config.SourceMonitor:
 		sendMonitor(bot, chatID)
 	}
 }
 
 func loadSource(bot *tgbotapi.BotAPI, chatID int64, key string) ([][]string, bool) {
-	url, err := sourceURL(key)
+	url, err := config.SourceURL(key)
 	if err != nil {
 		bot.Send(tgbotapi.NewMessage(chatID, "❌ Таблица не настроена. Открой ⚙️ Настройки"))
 		return nil, false
 	}
-	rows, err := fetchCSVFromURL(url)
+	rows, err := sheets.FetchCSV(url)
 	if err != nil {
 		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка загрузки данных"))
 		return nil, false
@@ -95,37 +84,46 @@ func loadSource(bot *tgbotapi.BotAPI, chatID int64, key string) ([][]string, boo
 }
 
 func sendDuty(bot *tgbotapi.BotAPI, chatID int64) {
-	rows, ok := loadSource(bot, chatID, SourceDuty)
+	rows, ok := loadSource(bot, chatID, config.SourceDuty)
 	if !ok {
 		return
 	}
-	drawDutyTable(rows)
-
-	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath("duty.png"))
+	path := outPath("duty.png")
+	if err := render.Duty(rows, path); err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка отрисовки"))
+		return
+	}
+	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(path))
 	photo.Caption = "📅 График дежурств"
 	bot.Send(photo)
 }
 
 func sendTimesheet(bot *tgbotapi.BotAPI, chatID int64) {
-	rows, ok := loadSource(bot, chatID, SourceTimesheet)
+	rows, ok := loadSource(bot, chatID, config.SourceTimesheet)
 	if !ok {
 		return
 	}
-	drawTable(parseCSV(rows))
-
-	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath("table.png"))
+	path := outPath("table.png")
+	if err := render.Timesheet(sheets.Parse(rows), path); err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка отрисовки"))
+		return
+	}
+	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(path))
 	photo.Caption = "⏱ График учёта времени"
 	bot.Send(photo)
 }
 
 func sendMonitor(bot *tgbotapi.BotAPI, chatID int64) {
-	rows, ok := loadSource(bot, chatID, SourceMonitor)
+	rows, ok := loadSource(bot, chatID, config.SourceMonitor)
 	if !ok {
 		return
 	}
-	drawMonitorTable(rows)
-
-	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath("monitor.png"))
+	path := outPath("monitor.png")
+	if err := render.Monitor(rows, path); err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка отрисовки"))
+		return
+	}
+	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(path))
 	photo.Caption = "📊 Мониторинг"
 	bot.Send(photo)
 }

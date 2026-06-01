@@ -1,4 +1,4 @@
-package main
+package telegram
 
 import (
 	"log"
@@ -6,6 +6,8 @@ import (
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
+	"duty-bot/internal/config"
 )
 
 var (
@@ -30,7 +32,7 @@ func doneProcessing(userID int64) {
 	processing[userID] = false
 }
 
-func startBot(token string) {
+func Start(token string) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Fatal("Ошибка создания бота:", err)
@@ -85,20 +87,20 @@ func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 		sendMenu(bot, chatID, userID)
 
 	case text == "/duty":
-		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, SourceDuty) })
+		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, config.SourceDuty) })
 
 	case text == "/time_schedule":
-		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, SourceTimesheet) })
+		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, config.SourceTimesheet) })
 
 	case text == "/monitor":
-		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, SourceMonitor) })
+		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, config.SourceMonitor) })
 
 	case text == "/settings":
 		sendSettings(bot, chatID, userID)
 	}
 }
 
-func handleWithCooldown(bot *tgbotapi.BotAPI, chatID int64, userID int64, handler func()) {
+func handleWithCooldown(bot *tgbotapi.BotAPI, chatID, userID int64, handler func()) {
 	if !canUse(userID) {
 		bot.Send(tgbotapi.NewMessage(chatID, "⏳ Подожди, запрос уже выполняется..."))
 		return

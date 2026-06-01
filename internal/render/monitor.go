@@ -1,12 +1,10 @@
-package main
+package render
 
-import (
-	"strings"
-)
+import "strings"
 
-func drawMonitorTable(rows [][]string) {
+func Monitor(rows [][]string, out string) error {
 	if len(rows) == 0 {
-		return
+		return nil
 	}
 
 	headers := rows[0]
@@ -76,5 +74,5 @@ func drawMonitorTable(rows [][]string) {
 		}
 	}
 
-	dc.SavePNG("monitor.png")
+	return dc.SavePNG(out)
 }

@@ -1,15 +1,17 @@
-package main
+package telegram
 
 import (
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
+	"duty-bot/internal/config"
 )
 
 var sourceTitles = map[string]string{
-	SourceDuty:      "📅 Дежурства",
-	SourceTimesheet: "⏱ График времени",
-	SourceMonitor:   "📊 Мониторинг",
+	config.SourceDuty:      "📅 Дежурства",
+	config.SourceTimesheet: "⏱ График времени",
+	config.SourceMonitor:   "📊 Мониторинг",
 }
 
 var (
@@ -17,8 +19,29 @@ var (
 	pendingEdit = make(map[int64]string)
 )
 
+func sendSettings(bot *tgbotapi.BotAPI, chatID, userID int64) {
+	if !config.IsAdmin(userID) {
+		bot.Send(tgbotapi.NewMessage(chatID, "⛔ Доступ только для администратора"))
+		return
+	}
+
+	msg := tgbotapi.NewMessage(chatID, "⚙️ *Настройки таблиц*\nВыбери, какую таблицу изменить:")
+	msg.ParseMode = "Markdown"
+	msg.ReplyMarkup = settingsKeyboard()
+	bot.Send(msg)
+}
+
+func settingsKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		[]tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData(sourceTitles[config.SourceDuty], "edit:"+config.SourceDuty)},
+		[]tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData(sourceTitles[config.SourceTimesheet], "edit:"+config.SourceTimesheet)},
+		[]tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData(sourceTitles[config.SourceMonitor], "edit:"+config.SourceMonitor)},
+		[]tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", "menu")},
+	)
+}
+
 func startEdit(bot *tgbotapi.BotAPI, chatID, userID int64, key string) {
-	if !isAdminID(userID) {
+	if !config.IsAdmin(userID) {
 		bot.Send(tgbotapi.NewMessage(chatID, "⛔ Доступ только для администратора"))
 		return
 	}
@@ -55,7 +78,7 @@ func consumePendingEdit(bot *tgbotapi.BotAPI, chatID, userID int64, text string)
 		return false
 	}
 
-	if err := setSource(key, text); err != nil {
+	if err := config.SetSource(key, text); err != nil {
 
 		editMu.Lock()
 		pendingEdit[userID] = key

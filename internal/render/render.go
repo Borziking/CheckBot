@@ -1,4 +1,4 @@
-package main
+package render
 
 import (
 	"fmt"
@@ -7,20 +7,23 @@ import (
 )
 
 const (
-	fontRegular = "Roboto-Regular.ttf"
-	fontMedium  = "Roboto-Medium.ttf"
-	fontBold    = "Roboto-Bold.ttf"
+	fontDir     = "assets/fonts"
+	fontRegular = fontDir + "/Roboto-Regular.ttf"
+	fontMedium  = fontDir + "/Roboto-Medium.ttf"
+	fontBold    = fontDir + "/Roboto-Bold.ttf"
 )
 
 const (
-	colBackdrop = "#EEF1F6"
+	colBackdrop = "#ECFDF5"
 	colCard     = "#FFFFFF"
-	colHeader   = "#111827"
+	colHeader   = "#059669"
 	colOnDark   = "#FFFFFF"
 	colText     = "#1F2937"
 	colMuted    = "#6B7280"
-	colBorder   = "#E5E7EB"
-	colRowAlt   = "#F8FAFC"
+	colBorder   = "#D1FAE5"
+	colRowAlt   = "#F0FDF4"
+	colTile     = "#F1F5F9"
+	colTileEmp  = "#E5E7EB"
 	colAccent   = "#10B981"
 	colAccentBg = "#D1FAE5"
 	colAccentTx = "#047857"
@@ -32,6 +35,11 @@ func hexRGB(hex string) (float64, float64, float64) {
 		fmt.Sscanf(hex[1:], "%02x%02x%02x", &r, &g, &b)
 	}
 	return float64(r) / 255, float64(g) / 255, float64(b) / 255
+}
+
+func hexRGBA(hex string, a float64) (float64, float64, float64, float64) {
+	r, g, b := hexRGB(hex)
+	return r, g, b, a
 }
 
 func setHex(dc *gg.Context, hex string) {
@@ -62,44 +70,6 @@ func textLeft(dc *gg.Context, s string, x, y, w, h, pad float64, font string, si
 	dc.DrawStringAnchored(s, x+pad, y+h/2, 0, 0.5)
 }
 
-func newCard(contentW, contentH, pad, titleH float64, title string) (*gg.Context, float64, float64) {
-	margin := 28.0
-	W := contentW + pad*2 + margin*2
-	H := contentH + pad*2 + margin*2 + titleH
-
-	dc := gg.NewContext(int(W), int(H))
-	setHex(dc, colBackdrop)
-	dc.Clear()
-
-	cardX, cardY := margin, margin
-	cardW := W - margin*2
-	cardH := H - margin*2
-
-	dc.SetRGBA(hexRGBA(colHeader, 0.10))
-	dc.DrawRoundedRectangle(cardX+3, cardY+6, cardW, cardH, 22)
-	dc.Fill()
-
-	fillRoundedHex(dc, cardX, cardY, cardW, cardH, 22, colCard)
-
-	if title != "" {
-		text(dc, title, cardX, cardY, cardW, titleH+pad, fontBold, 30, colText)
-
-		setHex(dc, colBorder)
-		dc.SetLineWidth(1)
-		dc.DrawLine(cardX+pad, cardY+titleH+pad/2, cardX+cardW-pad, cardY+titleH+pad/2)
-		dc.Stroke()
-	}
-
-	originX := cardX + pad
-	originY := cardY + titleH + pad
-	return dc, originX, originY
-}
-
-func hexRGBA(hex string, a float64) (float64, float64, float64, float64) {
-	r, g, b := hexRGB(hex)
-	return r, g, b, a
-}
-
 func drawCheck(dc *gg.Context, cx, cy, s float64, hex string) {
 	setHex(dc, hex)
 	dc.SetLineWidth(s * 0.18)
@@ -126,16 +96,32 @@ func fitString(dc *gg.Context, s, font string, size, maxW float64) string {
 	return string(r)
 }
 
-func fillTopRounded(dc *gg.Context, x, y, w, h, r float64, hex string) {
-	fillRoundedHex(dc, x, y, w, h, r, hex)
-	setHex(dc, hex)
-	dc.DrawRectangle(x, y+h-r, w, r)
-	dc.Fill()
-}
+func newCard(contentW, contentH, pad, titleH float64, title string) (*gg.Context, float64, float64) {
+	margin := 28.0
+	W := contentW + pad*2 + margin*2
+	H := contentH + pad*2 + margin*2 + titleH
 
-func fillBottomRounded(dc *gg.Context, x, y, w, h, r float64, hex string) {
-	fillRoundedHex(dc, x, y, w, h, r, hex)
-	setHex(dc, hex)
-	dc.DrawRectangle(x, y, w, r)
+	dc := gg.NewContext(int(W), int(H))
+	setHex(dc, colBackdrop)
+	dc.Clear()
+
+	cardX, cardY := margin, margin
+	cardW := W - margin*2
+	cardH := H - margin*2
+
+	dc.SetRGBA(hexRGBA(colText, 0.08))
+	dc.DrawRoundedRectangle(cardX+3, cardY+6, cardW, cardH, 22)
 	dc.Fill()
+
+	fillRoundedHex(dc, cardX, cardY, cardW, cardH, 22, colCard)
+
+	if title != "" {
+		text(dc, title, cardX, cardY, cardW, titleH+pad, fontBold, 30, colText)
+		setHex(dc, colBorder)
+		dc.SetLineWidth(1)
+		dc.DrawLine(cardX+pad, cardY+titleH+pad/2, cardX+cardW-pad, cardY+titleH+pad/2)
+		dc.Stroke()
+	}
+
+	return dc, cardX + pad, cardY + titleH + pad
 }
