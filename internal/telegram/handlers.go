@@ -39,6 +39,8 @@ func handleCallback(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery) {
 	userID := cq.From.ID
 	data := cq.Data
 
+	rememberUser(cq.From, cq.Message.Chat)
+
 	bot.Request(tgbotapi.NewCallback(cq.ID, ""))
 
 	switch {
@@ -47,6 +49,12 @@ func handleCallback(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery) {
 
 	case data == "settings":
 		sendSettings(bot, chatID, userID)
+
+	case data == "broadcast":
+		startBroadcast(bot, chatID, userID)
+
+	case strings.HasPrefix(data, "bcast:"):
+		handleBroadcastCallback(bot, chatID, userID, strings.TrimPrefix(data, "bcast:"))
 
 	case strings.HasPrefix(data, "show:"):
 		key := strings.TrimPrefix(data, "show:")

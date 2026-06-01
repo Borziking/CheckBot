@@ -8,6 +8,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"duty-bot/internal/config"
+	"duty-bot/internal/store"
 )
 
 var (
@@ -76,9 +77,11 @@ func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 
 	log.Printf(">>> message: '%s' от userID: %d", text, userID)
 
+	rememberUser(msg.From, msg.Chat)
+
 	if strings.HasPrefix(text, "/") {
-		clearPendingEdit(userID)
-	} else if consumePendingEdit(bot, chatID, userID, text) {
+		clearPending(userID)
+	} else if consumePending(bot, chatID, userID, text) {
 		return
 	}
 
@@ -107,4 +110,17 @@ func handleWithCooldown(bot *tgbotapi.BotAPI, chatID, userID int64, handler func
 	}
 	defer doneProcessing(userID)
 	handler()
+}
+
+func rememberUser(from *tgbotapi.User, chat *tgbotapi.Chat) {
+	if from == nil || chat == nil || !chat.IsPrivate() {
+		return
+	}
+	name := strings.TrimSpace(from.FirstName + " " + from.LastName)
+	store.Remember(store.User{
+		ID:       from.ID,
+		ChatID:   chat.ID,
+		Username: from.UserName,
+		Name:     name,
+	})
 }
