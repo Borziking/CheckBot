@@ -7,9 +7,21 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"duty-bot/internal/datadir"
 )
 
-const path = "config.json"
+func file() string { return datadir.Path("config.json") }
+
+func Ensure() {
+	dst := file()
+	if _, err := os.Stat(dst); err == nil {
+		return
+	}
+	if data, err := os.ReadFile("config.json"); err == nil {
+		os.WriteFile(dst, data, 0644)
+	}
+}
 
 const (
 	SourceDuty      = "duty"
@@ -29,7 +41,7 @@ func Load() (Config, error) {
 	defer mu.Unlock()
 
 	var cfg Config
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(file())
 	if err != nil {
 		return cfg, err
 	}
@@ -50,7 +62,7 @@ func Save(cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(file(), data, 0644)
 }
 
 func IsAdmin(userID int64) bool {

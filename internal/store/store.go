@@ -5,9 +5,11 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"duty-bot/internal/datadir"
 )
 
-const path = "users.json"
+func file() string { return datadir.Path("users.json") }
 
 type User struct {
 	ID        int64  `json:"id"`
@@ -30,7 +32,7 @@ func load() {
 	loaded = true
 	users = map[int64]User{}
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(file())
 	if err != nil {
 		return
 	}
@@ -48,7 +50,7 @@ func save() {
 		list = append(list, u)
 	}
 	if data, err := json.MarshalIndent(list, "", "  "); err == nil {
-		os.WriteFile(path, data, 0644)
+		os.WriteFile(file(), data, 0644)
 	}
 }
 
