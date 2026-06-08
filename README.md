@@ -62,18 +62,6 @@ go run ./cmd/bot         # либо: make run
 
 ---
 
-## Команды бота
-
-| Команда                  | Назначение |
-|--------------------------|------------|
-| `/menu`                  | Главное меню |
-| `/duty`                  | График дежурств |
-| `/time_schedule`         | График учёта времени |
-| `/monitor`               | Мониторинг |
-| `/settings`              | Настройка источников и рассылка (только админ) |
-
----
-
 ## Деплой (Docker)
 
 ```bash
@@ -86,14 +74,6 @@ docker run -d --env-file .env -v checkbot-data:/data checkbot
 внешний HTTPS не нужен.
 
 ---
-
-## Разработка
-
-```bash
-make run     # go run ./cmd/bot
-make vet     # go vet ./...
-make fmt     # gofmt -w .
-```
 
 ## Структура
 
