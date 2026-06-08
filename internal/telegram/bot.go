@@ -79,7 +79,7 @@ func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 
 	rememberUser(msg.From, msg.Chat)
 
-	if strings.HasPrefix(text, "/") {
+	if strings.HasPrefix(text, "/") || isMenuButton(text) {
 		clearPending(userID)
 	} else if consumePending(bot, chatID, userID, text) {
 		return
@@ -89,16 +89,16 @@ func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 	case text == "/start" || text == "/menu":
 		sendMenu(bot, chatID, userID)
 
-	case text == "/duty":
+	case text == "/duty" || text == btnDuty:
 		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, config.SourceDuty) })
 
-	case text == "/time_schedule":
+	case text == "/time_schedule" || text == btnTimesheet:
 		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, config.SourceTimesheet) })
 
-	case text == "/monitor":
+	case text == "/monitor" || text == btnMonitor:
 		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, config.SourceMonitor) })
 
-	case text == "/settings":
+	case text == "/settings" || text == btnSettings:
 		sendSettings(bot, chatID, userID)
 	}
 }

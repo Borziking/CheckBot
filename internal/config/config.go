@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -30,7 +31,6 @@ const (
 )
 
 type Config struct {
-	AdminID int64             `json:"admin_id"`
 	Sources map[string]string `json:"sources"`
 }
 
@@ -65,12 +65,15 @@ func Save(cfg Config) error {
 	return os.WriteFile(file(), data, 0644)
 }
 
-func IsAdmin(userID int64) bool {
-	cfg, err := Load()
-	if err != nil {
-		return false
+func AdminID() int64 {
+	if id, err := strconv.ParseInt(os.Getenv("ADMIN_ID"), 10, 64); err == nil {
+		return id
 	}
-	return cfg.AdminID == userID
+	return 0
+}
+
+func IsAdmin(userID int64) bool {
+	return userID != 0 && userID == AdminID()
 }
 
 func SourceURL(key string) (string, error) {

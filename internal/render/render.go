@@ -2,16 +2,33 @@ package render
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/fogleman/gg"
 )
 
-const (
-	fontDir     = "assets/fonts"
-	fontRegular = fontDir + "/Roboto-Regular.ttf"
-	fontMedium  = fontDir + "/Roboto-Medium.ttf"
-	fontBold    = fontDir + "/Roboto-Bold.ttf"
+var (
+	fontDir     = resolveFontDir()
+	fontRegular = filepath.Join(fontDir, "Roboto-Regular.ttf")
+	fontMedium  = filepath.Join(fontDir, "Roboto-Medium.ttf")
+	fontBold    = filepath.Join(fontDir, "Roboto-Bold.ttf")
 )
+
+func resolveFontDir() string {
+	if d := os.Getenv("ASSETS_DIR"); d != "" {
+		return filepath.Join(d, "fonts")
+	}
+	if exe, err := os.Executable(); err == nil {
+		d := filepath.Join(filepath.Dir(exe), "assets", "fonts")
+		if _, err := os.Stat(d); err == nil {
+			return d
+		}
+	}
+	return filepath.Join("assets", "fonts")
+}
 
 const (
 	colBackdrop = "#ECFDF5"
@@ -46,8 +63,13 @@ func setHex(dc *gg.Context, hex string) {
 	dc.SetRGB(hexRGB(hex))
 }
 
+var fontWarnOnce sync.Once
+
 func useFont(dc *gg.Context, path string, size float64) {
 	if err := dc.LoadFontFace(path, size); err != nil {
+		fontWarnOnce.Do(func() {
+			log.Printf("render: cannot load font %q: %v — text will be blank; check assets/fonts or set ASSETS_DIR", path, err)
+		})
 		dc.LoadFontFace(fontRegular, size)
 	}
 }

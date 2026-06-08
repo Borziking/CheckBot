@@ -2,7 +2,6 @@ package telegram
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -12,25 +11,57 @@ import (
 	"duty-bot/internal/sheets"
 )
 
-func outPath(name string) string {
-	return filepath.Join(os.TempDir(), name)
+const (
+	btnDuty      = "📅 Дежурства"
+	btnTimesheet = "⏱ График времени"
+	btnMonitor   = "📊 Мониторинг"
+	btnSettings  = "⚙️ Настройки"
+)
+
+func isMenuButton(text string) bool {
+	switch text {
+	case btnDuty, btnTimesheet, btnMonitor, btnSettings:
+		return true
+	}
+	return false
+}
+
+func sendRendered(bot *tgbotapi.BotAPI, chatID int64, prefix, caption string, draw func(path string) error) {
+	f, err := os.CreateTemp("", prefix+"-*.png")
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка отрисовки"))
+		return
+	}
+	path := f.Name()
+	f.Close()
+	defer os.Remove(path)
+
+	if err := draw(path); err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка отрисовки"))
+		return
+	}
+
+	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(path))
+	photo.Caption = caption
+	bot.Send(photo)
+}
+
+func mainKeyboard(userID int64) tgbotapi.ReplyKeyboardMarkup {
+	rows := [][]tgbotapi.KeyboardButton{
+		{tgbotapi.NewKeyboardButton(btnDuty), tgbotapi.NewKeyboardButton(btnTimesheet)},
+		{tgbotapi.NewKeyboardButton(btnMonitor)},
+	}
+	if config.IsAdmin(userID) {
+		rows = append(rows, []tgbotapi.KeyboardButton{tgbotapi.NewKeyboardButton(btnSettings)})
+	}
+	kb := tgbotapi.NewReplyKeyboard(rows...)
+	kb.ResizeKeyboard = true
+	return kb
 }
 
 func sendMenu(bot *tgbotapi.BotAPI, chatID, userID int64) {
-	rows := [][]tgbotapi.InlineKeyboardButton{
-		{tgbotapi.NewInlineKeyboardButtonData("📅 Дежурства", "show:"+config.SourceDuty)},
-		{tgbotapi.NewInlineKeyboardButtonData("⏱ График времени", "show:"+config.SourceTimesheet)},
-		{tgbotapi.NewInlineKeyboardButtonData("📊 Мониторинг", "show:"+config.SourceMonitor)},
-	}
-	if config.IsAdmin(userID) {
-		rows = append(rows, []tgbotapi.InlineKeyboardButton{
-			tgbotapi.NewInlineKeyboardButtonData("⚙️ Настройки", "settings"),
-		})
-	}
-
-	msg := tgbotapi.NewMessage(chatID, "📋 *Главное меню*\nВыбери действие:")
-	msg.ParseMode = "Markdown"
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
+	msg := tgbotapi.NewMessage(chatID, "📋 Главное меню — выбери действие на клавиатуре ниже.")
+	msg.ReplyMarkup = mainKeyboard(userID)
 	bot.Send(msg)
 }
 
@@ -47,18 +78,11 @@ func handleCallback(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery) {
 	case data == "menu":
 		sendMenu(bot, chatID, userID)
 
-	case data == "settings":
-		sendSettings(bot, chatID, userID)
-
 	case data == "broadcast":
 		startBroadcast(bot, chatID, userID)
 
 	case strings.HasPrefix(data, "bcast:"):
 		handleBroadcastCallback(bot, chatID, userID, strings.TrimPrefix(data, "bcast:"))
-
-	case strings.HasPrefix(data, "show:"):
-		key := strings.TrimPrefix(data, "show:")
-		go handleWithCooldown(bot, chatID, userID, func() { sendSource(bot, chatID, key) })
 
 	case strings.HasPrefix(data, "edit:"):
 		key := strings.TrimPrefix(data, "edit:")
@@ -96,14 +120,9 @@ func sendDuty(bot *tgbotapi.BotAPI, chatID int64) {
 	if !ok {
 		return
 	}
-	path := outPath("duty.png")
-	if err := render.Duty(rows, path); err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка отрисовки"))
-		return
-	}
-	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(path))
-	photo.Caption = "📅 График дежурств"
-	bot.Send(photo)
+	sendRendered(bot, chatID, "duty", "📅 График дежурств", func(path string) error {
+		return render.Duty(rows, path)
+	})
 }
 
 func sendTimesheet(bot *tgbotapi.BotAPI, chatID int64) {
@@ -111,14 +130,9 @@ func sendTimesheet(bot *tgbotapi.BotAPI, chatID int64) {
 	if !ok {
 		return
 	}
-	path := outPath("table.png")
-	if err := render.Timesheet(sheets.Parse(rows), path); err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка отрисовки"))
-		return
-	}
-	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(path))
-	photo.Caption = "⏱ График учёта времени"
-	bot.Send(photo)
+	sendRendered(bot, chatID, "timesheet", "⏱ График учёта времени", func(path string) error {
+		return render.Timesheet(sheets.Parse(rows), path)
+	})
 }
 
 func sendMonitor(bot *tgbotapi.BotAPI, chatID int64) {
@@ -126,12 +140,7 @@ func sendMonitor(bot *tgbotapi.BotAPI, chatID int64) {
 	if !ok {
 		return
 	}
-	path := outPath("monitor.png")
-	if err := render.Monitor(rows, path); err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка отрисовки"))
-		return
-	}
-	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(path))
-	photo.Caption = "📊 Мониторинг"
-	bot.Send(photo)
+	sendRendered(bot, chatID, "monitor", "📊 Мониторинг", func(path string) error {
+		return render.Monitor(rows, path)
+	})
 }

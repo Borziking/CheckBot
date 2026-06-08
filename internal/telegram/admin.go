@@ -165,7 +165,7 @@ func runBroadcast(bot *tgbotapi.BotAPI, adminChatID int64, text string) {
 		for _, u := range users {
 			if _, err := bot.Send(tgbotapi.NewMessage(u.ChatID, text)); err != nil {
 				fail++
-				log.Printf("broadcast: не доставлено %d: %v", u.ChatID, err)
+				log.Printf("broadcast: failed to deliver to %d: %v", u.ChatID, err)
 				if blockedByUser(err) {
 					store.Remove(u.ID)
 				}

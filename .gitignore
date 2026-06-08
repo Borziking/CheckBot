@@ -2,3 +2,5 @@
 .git
 duty-bot
 users.json
+config.json
+.env

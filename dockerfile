@@ -12,12 +12,13 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/bot .
 COPY assets ./assets
-# config.json в /app — это дефолт-сид; рабочая копия живёт в DATA_DIR.
-COPY config.json .
+# Seed config copied into the image; the working copy lives in DATA_DIR.
+COPY config.example.json ./config.json
 
-# Изменяемые данные (config.json, users.json) хранятся в томе и переживают
-# пересоздание контейнера.
+# Mutable data (config.json, users.json) lives in a volume and survives recreation.
 ENV DATA_DIR=/data
+# Where render looks for fonts (assets/fonts), independent of the working directory.
+ENV ASSETS_DIR=/app/assets
 VOLUME ["/data"]
 
 CMD ["./bot"]
