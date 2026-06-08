@@ -1,10 +1,11 @@
-# CheckBot
+<h3 align="center">Telegram-bot CheckBot</h3> 
+
+<p align="center">
+  <a href="https://go.dev"><img src="https://img.shields.io/badge/Go-1.25-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go"></a>
+  <a href="https://www.docker.com"><img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker"></a>
+</p>
 
 Телеграм-бот для парсинга Google Таблиц (CSV-экспорт) в чат в виде картинок
-
-**Стек:** Go 1.25, go-telegram-bot-api (Telegram, long polling), fogleman/gg (рендер
-PNG), godotenv. Состояние хранится в JSON-файлах (`config.json`, `users.json`) в
-каталоге `DATA_DIR`. Деплой — Docker
 
 ---
 
