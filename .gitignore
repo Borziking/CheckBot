@@ -1,6 +1,10 @@
-*.png
-.git
+/bin/
 duty-bot
-users.json
+bot
+
+*.png
+
 config.json
+users.json
+
 .env

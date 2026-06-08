@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"duty-bot/internal/datadir"
+	"github.com/Borziking/CheckBot/internal/datadir"
 )
 
 func file() string { return datadir.Path("config.json") }

@@ -6,9 +6,9 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"duty-bot/internal/config"
-	"duty-bot/internal/render"
-	"duty-bot/internal/sheets"
+	"github.com/Borziking/CheckBot/internal/config"
+	"github.com/Borziking/CheckBot/internal/render"
+	"github.com/Borziking/CheckBot/internal/sheets"
 )
 
 const (

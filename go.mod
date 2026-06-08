@@ -1,4 +1,4 @@
-module duty-bot
+module github.com/Borziking/CheckBot
 
 go 1.25.0
 

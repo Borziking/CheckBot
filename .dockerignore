@@ -1,2 +1,9 @@
-*.png
 .git
+.env
+*.png
+/bin/
+duty-bot
+bot
+config.json
+users.json
+README.md

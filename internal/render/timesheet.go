@@ -3,7 +3,7 @@ package render
 import (
 	"strings"
 
-	"duty-bot/internal/sheets"
+	"github.com/Borziking/CheckBot/internal/sheets"
 )
 
 func statusColor(value string) (bg, fg string) {

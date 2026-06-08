@@ -7,8 +7,8 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"duty-bot/internal/config"
-	"duty-bot/internal/store"
+	"github.com/Borziking/CheckBot/internal/config"
+	"github.com/Borziking/CheckBot/internal/store"
 )
 
 var (
